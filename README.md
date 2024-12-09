@@ -1,7 +1,7 @@
-git clone https://github.com/adayzhan/Interdisciplinary-project.git
-python -m pip install --upgrade pip
-pip install enum --upgrade
-pip install numpy --upgrade
-pip install simpy --upgrade
-pip install matplotlib --upgrade
+git clone https://github.com/adayzhan/Interdisciplinary-project.git <br>
+python -m pip install --upgrade pip <br>
+pip install enum --upgrade <br>
+pip install numpy --upgrade <br>
+pip install simpy --upgrade <br>
+pip install matplotlib --upgrade <br>
 py .\main.py
