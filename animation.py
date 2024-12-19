@@ -18,6 +18,9 @@ def animateSimulation(simulation: Simulation):
     ax.set_xlim(0, MAP_SIZE[0])
     ax.set_ylim(0, MAP_SIZE[1])
 
+    # Plot edges
+    # edges = simulation.simMap.pathFinder.vis_graph.getEdges().reshape(-1, 2).transpose()
+    # ax.plot(*edges, c='y', )
     # Plot buildings
     for rect in rectangles:
         degrees = np.degrees(rect[-1])
@@ -29,6 +32,9 @@ def animateSimulation(simulation: Simulation):
     drone_scatters = [ax.scatter(drone.position[0], drone.position[1], marker='v',s=10, c='red', label='Drones') for drone in drones]
     pending_orders = ax.scatter([], [], s = 10, c='yellow', label = 'Pending Orders')
     processed_orders = ax.scatter([], [], s = 10, c='orange', label = 'Processed Orders')
+
+    
+
 
     # Update function for animation
     def update(frame):

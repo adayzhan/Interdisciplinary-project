@@ -19,11 +19,11 @@ def calculateTime(distance: float, speed: float, delivery: bool = False) -> floa
     return time
 
 class Drone:
-    def __init__(self, env, name: str, position: tuple[float, float], simMap: SimulationMap):
+    def __init__(self, env, name: str, position: np.ndarray, simMap: SimulationMap):
         self.env = env
         self.sleep = env.event()
         self.name: str = name
-        self.position: tuple[float, float] = position
+        self.position: np.ndarray = position
         self.simMap: SimulationMap = simMap
         self.battery: float = vars.BATTERY_CAPACITY
         self.speed: float = vars.DRONE_SPEED
@@ -39,26 +39,31 @@ class Drone:
             match self.status:
                 case Status.READY:
                     try:
+                        proc = None
                         if self.at_station:
-                            yield self.env.process(self.charge())
+                            proc = self.env.process(self.charge())
+                            yield proc
                             yield self.sleep
                         else:
-                            path, _ = self.simMap.getPathToNearestWarehouse(self.position)
-                            print(path)
-                            yield self.env.process(self.fly(path))
+                            path, _ = self.simMap.getPathToNearestWarehouse(self.position.copy())
+                            proc = self.env.process(self.fly(path))
+                            yield proc
                             self.at_station = True
                     except simpy.Interrupt:
+                        if proc.is_alive: proc.interrupt()
                         continue
                 case Status.DELIVERING:
                     self.at_station = False
-                    print(f'{self.name} starts journey to process Order {self.order_id}')
-                    print(f'{self.name} now at {self.position} 1')
-                    yield self.env.process(self.fly(self.path))
-                    print(f'{self.name} now at {self.position} 2')
-                    #self.fly(self.path[:self.stop + 1])
-                    #self.env.timeout(vars.LOADING_TIME)
-                    #self.fly(self.path[self.stop:])
-                    #self.env.timeout(vars.UNLOADING_TIME)
+                    print(f'''{self.name} starts delivery to Order {self.order_id}
+                          Current time: {self.env.now}
+                          Current location: ({self.position[0]:.1f}, {self.position[1]:.1f})
+                          Destination: ({self.path[-1][0]:.1f}, {self.path[-1][1]:.1f})''')
+                    
+                    yield self.env.process(self.fly(self.path[:self.stop + 1])) # [p, s,| d] [s,| d] [p, s|]
+                    self.env.timeout(vars.LOADING_TIME)
+                    yield self.env.process(self.fly(self.path[self.stop:])) # [p,| s, d] [|s, d] [p, |s]
+                    self.env.timeout(vars.UNLOADING_TIME)
+
                     if self.battery < vars.LOW_BATTERY: self.status = Status.CHARGING
                     else: self.status = Status.READY
                 case Status.CHARGING:
@@ -71,21 +76,26 @@ class Drone:
                         self.at_station = True
 
     def fly(self, path):
-        if path:
-            for p in path[1:]:
-                while self.simMap.distance([self.position, p]) > self.speed:
-                    pos = list(self.position)
-                    pos[0] += (p[0] - pos[0]) / self.simMap.distance([pos, p]) * self.speed
-                    pos[1] += (p[1] - pos[1]) / self.simMap.distance([pos, p]) * self.speed
-                    self.position = tuple(pos)
-                    self.battery -= vars.DISCHARGING_SPEED
-                    yield self.env.timeout(1)
-                self.position = p
+        try:
+            if len(path) > 1:
+                for p in path[1:]:
+                    while self.simMap.distance([self.position, p]) > self.speed:
+                        pos = self.position.copy()
+                        pos += (p - pos) / np.sqrt(np.sum((p-pos)**2)) * self.speed
+                        self.position = pos
+                        self.battery -= vars.DISCHARGING_SPEED
+                        yield self.env.timeout(1)
+                    self.position = p
+        except simpy.Interrupt:
+            pass
 
     def charge(self, charge_to=vars.BATTERY_CAPACITY):
-        time = (charge_to - self.battery)/vars.CHARGING_SPEED
-        if time > 0:
-            yield self.env.timeout(time)
+        try:
+            time = (charge_to - self.battery)/vars.CHARGING_SPEED
+            if time > 0:
+                yield self.env.timeout(time)
+        except simpy.Interrupt:
+            pass
 
     def haveOrder(self) -> bool: return self.status == Status.DELIVERING
 
