@@ -4,4 +4,5 @@ pip install enum --upgrade <br>
 pip install numpy --upgrade <br>
 pip install simpy --upgrade <br>
 pip install matplotlib --upgrade <br>
+pip install Dijkstar <br>
 py .\main.py
